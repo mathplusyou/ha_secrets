@@ -126,6 +126,12 @@ resource "kubernetes_stateful_set" "consul" {
     service_name = "consul"
     replicas     = 3
 
+    selector {
+      match_labels {
+        app = "consul"
+      }
+    }
+
     template {
       metadata {
         labels {
@@ -137,7 +143,7 @@ resource "kubernetes_stateful_set" "consul" {
 
       spec {
         security_context {
-          fsGroup = 1000
+          fs_group = 1000
         }
 
         container {
@@ -152,7 +158,9 @@ resource "kubernetes_stateful_set" "consul" {
                 field_path = "status.podIP"
               }
             }
+          }
 
+          env {
             name = "GOSSIP_ENCRYPTION_KEY"
 
             value_from {
@@ -161,7 +169,9 @@ resource "kubernetes_stateful_set" "consul" {
                 key  = "gossip-encryption-key"
               }
             }
+          }
 
+          env {
             name = "NAMESPACE"
 
             value_from {
@@ -169,6 +179,87 @@ resource "kubernetes_stateful_set" "consul" {
                 field_path = "metadata.namespace"
               }
             }
+          }
+
+          args = ["agent", "-advertise=$(POD_IP)", "-bind=0.0.0.0", "-bootstrap-expect=3", "-retry-join=consul-0.consul.$(NAMESPACE).svc.cluster.local", "-retry-join=consul-1.consul.$(NAMESPACE).svc.cluster.local", "-retry-join=consul-2.consul.$(NAMESPACE).svc.cluster.local", "-client=0.0.0.0", "-config-file=/consul/myconfig/config.json", "-datacenter=dc1", "-data-dir=/consul/data", "-domain=cluster.local", "-encrypt=$(GOSSIP_ENCRYPTION_KEY)", "-server", "-ui", "-disable-host-node-id"]
+
+          volume_mount {
+            name       = "config"
+            mount_path = "/consul/myconfig"
+          }
+
+          volume_mount {
+            name       = "tls"
+            mount_path = "/etc/tls"
+          }
+
+          lifecycle {
+            pre_stop {
+              exec {
+                command = ["/bin/sh", "-c", "consul leave"]
+              }
+            }
+          }
+
+          port {
+            container_port = 8500
+            name           = "ui-port"
+          }
+
+          port {
+            container_port = 8400
+            name           = "alt-port"
+          }
+
+          port {
+            container_port = 53
+            name           = "udp-port"
+          }
+
+          port {
+            container_port = 8443
+            name           = "https-port"
+          }
+
+          port {
+            container_port = 8080
+            name           = "http-port"
+          }
+
+          port {
+            container_port = 8301
+            name           = "serflan"
+          }
+
+          port {
+            container_port = 8302
+            name           = "serfwan"
+          }
+
+          port {
+            container_port = 8600
+            name           = "consuldns"
+          }
+
+          port {
+            container_port = 8300
+            name           = "server"
+          }
+        }
+
+        volume {
+          name = "config"
+
+          config_map {
+            name = "consul"
+          }
+        }
+
+        volume {
+          name = "tls"
+
+          secret {
+            secret_name = "consul"
           }
         }
       }
