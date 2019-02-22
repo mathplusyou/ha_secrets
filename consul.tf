@@ -15,7 +15,7 @@ resource "kubernetes_secret" "consul" {
 }
 
 # CONSUL CONFIGMAP
-data "template_file" "cm" {
+data "template_file" "consul_config" {
   template = <<CONSULCONFIG
 {
   "ca_file": "/etc/tls/ca.pem",
@@ -31,13 +31,13 @@ data "template_file" "cm" {
 CONSULCONFIG
 }
 
-resource "kubernetes_config_map" "example" {
+resource "kubernetes_config_map" "consul" {
   metadata {
     name = "consul"
   }
 
   data {
-    config.json = "${data.template_file.cm.rendered}"
+    config.json = "${data.template_file.consul_config.rendered}"
   }
 }
 
